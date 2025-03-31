@@ -21,9 +21,21 @@
       cursor: pointer;
       font-size: 16px;
       margin: 10px 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
     button:hover {
       background-color: #0051a8;
+    }
+    button img {
+      margin-right: 8px;
+      height: 20px;
+    }
+    .button-container {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
     }
     pre {
       background-color: #f1f1f1;
@@ -52,15 +64,21 @@
 </head>
 <body>
   <h1>Internet Identity Authentication Test</h1>
-  <p>This page tests authentication with Internet Identity.</p>
+  <p>This page tests authentication with Internet Identity and Plug wallet.</p>
   
-  <div>
-    <button id="loginButton">Login with Internet Identity</button>
-    <button id="logoutButton" style="display:none;">Logout</button>
+  <div class="button-container">
+    <button id="loginButton">
+      <img src="https://internetcomputer.org/img/IC_logo.svg" alt="Internet Identity" width="20" height="20">
+      Login with Internet Identity
+    </button>
+    <button id="plugButton">
+      <img src="https://plugwallet.ooo/assets/images/plug-logo.svg" alt="Plug Wallet" width="20" height="20">
+      Connect with Plug Wallet
+    </button>
   </div>
   
   <div id="status" class="status info">
-    Ready to test Internet Identity authentication.
+    Ready to test authentication. Choose a login method above.
   </div>
   
   <div id="principalInfo" style="display:none;">
@@ -87,7 +105,7 @@
     }
 
     // Login function - opens Internet Identity in a new window
-    function login() {
+    function loginWithII() {
       try {
         logDebug('Opening Internet Identity login page...');
         updateStatus('Redirecting to Internet Identity...', 'info');
@@ -104,10 +122,62 @@
       }
     }
 
+    // Connect with Plug Wallet
+    function connectWithPlug() {
+      try {
+        logDebug('Attempting to connect with Plug wallet...');
+        updateStatus('Connecting to Plug wallet...', 'info');
+        
+        // Check if Plug is installed
+        if (window.ic?.plug) {
+          logDebug('Plug wallet detected');
+          
+          // Request connection to Plug
+          window.ic.plug.requestConnect({
+            whitelist: ['hi7bu-myaaa-aaaad-aaloa-cai'], // Your canister ID
+            host: 'https://ic0.app'
+          }).then(connected => {
+            if (connected) {
+              logDebug('Successfully connected to Plug wallet');
+              updateStatus('Connected to Plug wallet!', 'success');
+              
+              // Get the principal ID
+              const principal = window.ic.plug.principalId;
+              if (principal) {
+                document.getElementById('principalId').textContent = principal;
+                document.getElementById('principalInfo').style.display = 'block';
+                logDebug(`Principal ID: ${principal}`);
+              }
+            } else {
+              logDebug('User rejected Plug connection');
+              updateStatus('Plug connection was rejected', 'error');
+            }
+          }).catch(error => {
+            logDebug(`Plug connection error: ${error.message}`);
+            updateStatus(`Failed to connect to Plug: ${error.message}`, 'error');
+          });
+        } else {
+          logDebug('Plug wallet not detected');
+          updateStatus('Plug wallet not detected. Please install Plug extension first.', 'error');
+          
+          // Open Plug wallet website
+          window.open('https://plugwallet.ooo/', '_blank');
+        }
+      } catch (error) {
+        logDebug(`Error connecting to Plug: ${error.message}`);
+        updateStatus(`Failed to connect to Plug: ${error.message}`, 'error');
+      }
+    }
+
     // Set up event listeners
     document.getElementById('loginButton').addEventListener('click', () => {
-      logDebug('Login button clicked');
-      login();
+      logDebug('Internet Identity login button clicked');
+      loginWithII();
+    });
+    
+    document.getElementById('plugButton').addEventListener('click', () => {
+      logDebug('Plug wallet button clicked');
+      connectWithPlug();
     });
 
     // Log initialization
