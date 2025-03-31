@@ -10,11 +10,10 @@ interface AuthSubscriber {
 class AuthManager {
   private authClient: AuthClient | null = null;
   private subscribers: AuthSubscriber[] = [];
-  private reconnectTimer: number | null = null;
-  private readonly RECONNECT_INTERVAL = 5000;
   private mockIdentity: boolean = false;
   private mockPrincipal: Principal | null = null;
   private mockAuthenticated: boolean = false;
+  private loginInProgress: boolean = false;
 
   async initialize(): Promise<void> {
     // Check if we're in mock mode
@@ -37,6 +36,13 @@ class AuthManager {
       });
       
       console.log('AuthClient initialized successfully');
+      
+      // Check if already authenticated
+      const isAuthenticated = await this.authClient.isAuthenticated();
+      if (isAuthenticated) {
+        console.log('User is already authenticated');
+        this.notifySubscribers(true);
+      }
     } catch (error) {
       console.error('Failed to initialize AuthClient:', error);
     }
@@ -52,13 +58,6 @@ class AuthManager {
     window.addEventListener('online', () => {
       this.checkSession();
     });
-
-    // Initial session check
-    if (await this.isAuthenticated()) {
-      this.notifySubscribers(true);
-    } else {
-      this.startReconnectTimer();
-    }
   }
 
   private async checkSession(): Promise<void> {
@@ -67,79 +66,78 @@ class AuthManager {
 
     const isAuthenticated = await this.authClient.isAuthenticated();
     this.notifySubscribers(isAuthenticated);
-
-    if (!isAuthenticated) {
-      this.startReconnectTimer();
-    }
-  }
-
-  private startReconnectTimer(): void {
-    if (this.mockIdentity) return;
-    if (this.reconnectTimer !== null) {
-      window.clearInterval(this.reconnectTimer);
-    }
-
-    this.reconnectTimer = window.setInterval(async () => {
-      if (await this.isAuthenticated()) {
-        this.notifySubscribers(true);
-        if (this.reconnectTimer !== null) {
-          window.clearInterval(this.reconnectTimer);
-          this.reconnectTimer = null;
-        }
-      }
-    }, this.RECONNECT_INTERVAL);
   }
 
   async login(): Promise<void> {
-    if (this.mockIdentity) {
-      // Simulate a successful login in mock mode
-      this.mockAuthenticated = true;
-      setTimeout(() => {
-        this.notifySubscribers(true);
-      }, 500);
+    if (this.loginInProgress) {
+      console.log('Login already in progress');
       return;
     }
+    
+    this.loginInProgress = true;
+    
+    try {
+      if (this.mockIdentity) {
+        // Simulate a successful login in mock mode
+        this.mockAuthenticated = true;
+        setTimeout(() => {
+          this.notifySubscribers(true);
+          this.loginInProgress = false;
+        }, 500);
+        return;
+      }
 
-    if (!this.authClient) {
-      console.log('Reinitializing AuthClient...');
-      try {
+      if (!this.authClient) {
+        console.log('Creating new AuthClient...');
         this.authClient = await AuthClient.create({
           idleOptions: {
             disableIdle: true,
             disableDefaultIdleCallback: true
           }
         });
-      } catch (error) {
-        console.error('Failed to initialize AuthClient:', error);
-        throw new Error('Failed to initialize authentication client');
       }
-    }
 
-    // Get Internet Identity URL from our configuration
-    const identityProviderUrl = IC_CONFIG.getInternetIdentityUrl();
-    console.log('Logging in with Internet Identity at:', identityProviderUrl);
-
-    return new Promise<void>((resolve, reject) => {
-      try {
-        // Use the standard login flow with Internet Identity
+      // Direct approach using delegations
+      return new Promise<void>((resolve, reject) => {
+        const identityProviderUrl = IC_CONFIG.getInternetIdentityUrl();
+        console.log('Using Internet Identity at:', identityProviderUrl);
+        
+        // Create a dedicated login button that will be programmatically clicked
+        const loginButton = document.createElement('button');
+        loginButton.style.display = 'none';
+        document.body.appendChild(loginButton);
+        
+        const handleAuthenticated = async (success: boolean) => {
+          document.body.removeChild(loginButton);
+          this.loginInProgress = false;
+          
+          if (success) {
+            console.log('Authentication successful');
+            this.notifySubscribers(true);
+            resolve();
+          } else {
+            console.error('Authentication failed');
+            reject(new Error('Authentication failed'));
+          }
+        };
+        
+        // Use the render method which is more reliable
         this.authClient!.login({
           identityProvider: identityProviderUrl,
           maxTimeToLive: BigInt(7 * 24 * 60 * 60 * 1000 * 1000 * 1000), // 7 days in nanoseconds
-          onSuccess: () => {
-            console.log('Login successful');
-            this.notifySubscribers(true);
-            resolve();
-          },
+          onSuccess: () => handleAuthenticated(true),
           onError: (error) => {
             console.error('Authentication error:', error);
+            handleAuthenticated(false);
             reject(error);
           }
         });
-      } catch (error) {
-        console.error('Failed to initiate login:', error);
-        reject(error);
-      }
-    });
+      });
+    } catch (error) {
+      this.loginInProgress = false;
+      console.error('Login failed:', error);
+      throw error;
+    }
   }
 
   async logout(): Promise<void> {

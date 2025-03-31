@@ -19,10 +19,6 @@ interface ICConfig {
   getAuthClientOptions: () => Record<string, unknown>;
 }
 
-// Determine if we're in development mode
-const isDevelopment = import.meta.env.MODE === 'development';
-const isProduction = import.meta.env.PROD === true;
-
 // Internet Computer configuration
 export const IC_CONFIG: ICConfig = {
   // Network configuration
