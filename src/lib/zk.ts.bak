@@ -1,0 +1,85 @@
+import * as snarkjs from 'snarkjs';
+
+const wasmPath = '/circuits/token_balance_js/token_balance.wasm';
+const zkeyPath = '/circuits/token_balance_js/token_balance.zkey';
+const vkeyPath = '/circuits/token_balance_js/verification_key.json';
+
+export async function generateZKProof(balance: bigint, minRequired: bigint, salt: bigint) {
+  try {
+    console.log('Generating ZK proof with inputs:', { balance, minRequired, salt });
+
+    const input = {
+      balance: balance.toString(),
+      minRequired: minRequired.toString(),
+      salt: salt.toString()
+    };
+
+    // Fetch and check the WASM file
+    console.log('Fetching WASM file from:', wasmPath);
+    const wasmResponse = await fetch(wasmPath);
+    if (!wasmResponse.ok) {
+      throw new Error(`Failed to fetch WASM file (${wasmResponse.status}): ${wasmResponse.statusText}`);
+    }
+    const wasmBuffer = await wasmResponse.arrayBuffer();
+    
+    // Verify WASM magic number
+    const wasmBytes = new Uint8Array(wasmBuffer);
+    if (wasmBytes.length < 4 || 
+        wasmBytes[0] !== 0x00 || 
+        wasmBytes[1] !== 0x61 ||
+        wasmBytes[2] !== 0x73 ||
+        wasmBytes[3] !== 0x6D) {
+      throw new Error('Invalid WASM file format');
+    }
+
+    // Fetch and check the zkey file
+    console.log('Fetching zkey file from:', zkeyPath);
+    const zkeyResponse = await fetch(zkeyPath);
+    if (!zkeyResponse.ok) {
+      throw new Error(`Failed to fetch zkey file (${zkeyResponse.status}): ${zkeyResponse.statusText}`);
+    }
+    const zkeyBuffer = await zkeyResponse.arrayBuffer();
+
+    console.log('Files loaded successfully, generating proof...');
+
+    const { proof, publicSignals } = await snarkjs.groth16.fullProve(
+      input,
+      new Uint8Array(wasmBuffer),
+      new Uint8Array(zkeyBuffer)
+    );
+
+    console.log('Proof generated successfully:', { proof, publicSignals });
+
+    return {
+      success: true,
+      proof,
+      publicSignals
+    };
+  } catch (error) {
+    console.error("Error generating ZK proof:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
+}
+
+export async function verifyZKProof(proof: any, publicSignals: any) {
+  try {
+    console.log('Verifying proof...');
+
+    const vkeyResponse = await fetch(vkeyPath);
+    if (!vkeyResponse.ok) {
+      throw new Error(`Failed to fetch verification key (${vkeyResponse.status}): ${vkeyResponse.statusText}`);
+    }
+    const vKey = await vkeyResponse.json();
+
+    const isValid = await snarkjs.groth16.verify(vKey, publicSignals, proof);
+    console.log('Proof verification result:', isValid);
+
+    return isValid;
+  } catch (error) {
+    console.error("Error verifying ZK proof:", error);
+    return false;
+  }
+}

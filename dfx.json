@@ -1,0 +1,33 @@
+{
+  "canisters": {
+    "ghost": {
+      "type": "rust",
+      "package": "ghost",
+      "candid": "src/backend/ghost/ghost.did",
+      "build": "cargo build --target wasm32-unknown-unknown --release",
+      "wasm": "target/wasm32-unknown-unknown/release/ghost.wasm"
+    },
+    "ghost_frontend": {
+      "type": "assets",
+      "dependencies": ["ghost"],
+      "frontend": {
+        "entrypoint": "index.html"
+      },
+      "source": ["dist/"],
+      "build": "npm run build"
+    }
+  },
+  "defaults": {
+    "build": {
+      "packtool": "",
+      "args": ""
+    }
+  },
+  "networks": {
+    "local": {
+      "bind": "127.0.0.1:8000",
+      "type": "ephemeral"
+    }
+  },
+  "version": 1
+}

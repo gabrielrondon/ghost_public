@@ -1,0 +1,16 @@
+service : {
+    "getWalletInfo": (text) -> (record {
+        address: text;
+        balance: text;
+        tokens: vec record {
+            symbol: text;
+            balance: text;
+        };
+    }) query;
+    "generateProof": (text, text) -> (record {
+        proof: vec nat8;
+        publicInputs: vec text;
+        reference: text;
+    });
+    "verifyProof": (text) -> (bool) query;
+}

@@ -1,0 +1,18 @@
+[package]
+name = "ghost"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+candid = "0.9.11"
+ic-cdk = "0.11.3"
+ic-cdk-macros = "0.8.1"
+serde = "1.0.188"
+serde_derive = "1.0.188"
+ic-ledger-types = "0.8.0"
+num-traits = "0.2.15"
+sha2 = "0.10.7"
+hex = "0.4.3"
