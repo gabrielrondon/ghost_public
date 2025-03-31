@@ -93,7 +93,7 @@
     // Define token canister IDs
     const TOKEN_CANISTERS = {
       ICP: 'ryjl3-tyaaa-aaaaa-aaaba-cai',
-      ORIGYN: 'ogy7f-maaaa-aaaak-qaaca-cai',
+      // Using only verified canister IDs
       SONIC: 'qbizb-wiaaa-aaaak-aafbq-cai'
     };
     
@@ -143,9 +143,10 @@
           const whitelist = [
             'hi7bu-myaaa-aaaad-aaloa-cai', // ZK canister
             TOKEN_CANISTERS.ICP,
-            TOKEN_CANISTERS.ORIGYN,
             TOKEN_CANISTERS.SONIC
           ];
+          
+          logDebug(`Connecting with whitelist: ${whitelist.join(', ')}`);
           
           window.ic.plug.requestConnect({
             whitelist: whitelist,
