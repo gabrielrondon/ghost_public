@@ -134,8 +134,8 @@
           
           // Request connection to Plug
           window.ic.plug.requestConnect({
-            whitelist: ['hi7bu-myaaa-aaaad-aaloa-cai'], // Your canister ID
-            host: 'https://ic0.app'
+            whitelist: ['hi7bu-myaaa-aaaad-aaloa-cai'], // Your ZK canister ID
+            host: 'https://ic0.app' // Explicitly use the IC mainnet
           }).then(connected => {
             if (connected) {
               logDebug('Successfully connected to Plug wallet');
@@ -147,6 +147,9 @@
                 document.getElementById('principalId').textContent = principal;
                 document.getElementById('principalInfo').style.display = 'block';
                 logDebug(`Principal ID: ${principal}`);
+                
+                // Fetch token balances
+                fetchTokenBalances();
               }
             } else {
               logDebug('User rejected Plug connection');
@@ -166,6 +169,34 @@
       } catch (error) {
         logDebug(`Error connecting to Plug: ${error.message}`);
         updateStatus(`Failed to connect to Plug: ${error.message}`, 'error');
+      }
+    }
+    
+    // Fetch token balances using Plug wallet
+    async function fetchTokenBalances() {
+      try {
+        logDebug('Fetching token balances...');
+        
+        if (!window.ic?.plug) {
+          throw new Error('Plug wallet not available');
+        }
+        
+        // Try to fetch balances
+        const balances = await window.ic.plug.requestBalance();
+        
+        logDebug(`Received ${balances.length} token balances`);
+        
+        // Display balances
+        const balanceInfo = balances.map(token => 
+          `${token.name} (${token.symbol}): ${token.amount}`
+        ).join('\n');
+        
+        document.getElementById('principalId').textContent += '\n\nToken Balances:\n' + balanceInfo;
+        
+        updateStatus('Connected to Plug wallet and fetched balances!', 'success');
+      } catch (error) {
+        logDebug(`Error fetching balances: ${error.message}`);
+        updateStatus(`Connected, but failed to fetch balances: ${error.message}`, 'error');
       }
     }
 
