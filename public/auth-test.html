@@ -4,7 +4,22 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Internet Identity Auth Test</title>
-  <script src="https://cdn.jsdelivr.net/npm/@dfinity/auth-client/dist/auth-client.min.js"></script>
+  <!-- Import the auth-client as an ES module -->
+  <script type="module">
+    // Import auth-client from Skypack (a CDN that supports ES modules)
+    import { AuthClient } from 'https://cdn.skypack.dev/@dfinity/auth-client';
+    
+    // Make AuthClient available globally
+    window.AuthClientModule = { AuthClient };
+    
+    // Signal that the module has loaded
+    window.authClientLoaded = true;
+    
+    // Trigger the init function if it's already defined
+    if (window.initializeAuthTest) {
+      window.initializeAuthTest();
+    }
+  </script>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
@@ -56,12 +71,12 @@
   <p>This page tests authentication with Internet Identity.</p>
   
   <div>
-    <button id="loginButton">Login with Internet Identity</button>
+    <button id="loginButton" disabled>Login with Internet Identity</button>
     <button id="logoutButton" style="display:none;">Logout</button>
   </div>
   
   <div id="status" class="status info">
-    Not authenticated. Click the login button to start.
+    Loading authentication client...
   </div>
   
   <div id="principalInfo" style="display:none;">
@@ -91,16 +106,12 @@
     async function initAuthClient() {
       try {
         logDebug('Initializing AuthClient...');
-        // Check if AuthClient is available in the global scope
-        if (typeof AuthClient === 'undefined') {
-          logDebug('AuthClient not found in global scope. Checking for window.AuthClient...');
-          if (typeof window.AuthClient === 'undefined') {
-            throw new Error('AuthClient library not loaded properly');
-          }
+        
+        if (!window.AuthClientModule || !window.AuthClientModule.AuthClient) {
+          throw new Error('AuthClient module not loaded properly');
         }
         
-        // Use the correct path to AuthClient
-        const authClient = await AuthClient.create({
+        const authClient = await window.AuthClientModule.AuthClient.create({
           idleOptions: {
             disableIdle: true,
             disableDefaultIdleCallback: true
@@ -185,39 +196,44 @@
       }
     }
 
-    // Initialize the page
-    window.onload = async () => {
+    // Main initialization function
+    async function initializeAuthTest() {
       try {
-        logDebug('Page loaded, waiting for AuthClient to be available...');
+        logDebug('Auth client module loaded, initializing...');
         
-        // Wait a moment to ensure the library is loaded
-        setTimeout(async () => {
-          try {
-            const authClient = await initAuthClient();
-            
-            // Check if already authenticated
-            await checkAuthentication(authClient);
-            
-            // Set up event listeners
-            document.getElementById('loginButton').addEventListener('click', () => login(authClient));
-            document.getElementById('logoutButton').addEventListener('click', () => logout(authClient));
-            
-            // Check authentication status when page becomes visible
-            document.addEventListener('visibilitychange', () => {
-              if (document.visibilityState === 'visible') {
-                checkAuthentication(authClient);
-              }
-            });
-          } catch (error) {
-            logDebug(`Delayed initialization error: ${error.message}`);
-            updateStatus(`Failed to initialize: ${error.message}`, 'error');
+        // Enable the login button
+        document.getElementById('loginButton').disabled = false;
+        
+        const authClient = await initAuthClient();
+        
+        // Check if already authenticated
+        await checkAuthentication(authClient);
+        
+        // Set up event listeners
+        document.getElementById('loginButton').addEventListener('click', () => login(authClient));
+        document.getElementById('logoutButton').addEventListener('click', () => logout(authClient));
+        
+        // Check authentication status when page becomes visible
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') {
+            checkAuthentication(authClient);
           }
-        }, 1000);
+        });
       } catch (error) {
         logDebug(`Initialization error: ${error.message}`);
         updateStatus(`Failed to initialize: ${error.message}`, 'error');
       }
-    };
+    }
+
+    // Store the initialization function globally
+    window.initializeAuthTest = initializeAuthTest;
+    
+    // Check if the auth client module has already loaded
+    if (window.authClientLoaded) {
+      initializeAuthTest();
+    } else {
+      logDebug('Waiting for auth client module to load...');
+    }
   </script>
 </body>
 </html>
