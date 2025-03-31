@@ -3,9 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Internet Identity Auth Test</title>
-  <!-- Import the required libraries -->
-  <script src="https://identity.ic0.app/auth-client.js"></script>
+  <title>Internet Identity Authentication Test</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
@@ -62,7 +60,7 @@
   </div>
   
   <div id="status" class="status info">
-    Loading authentication client...
+    Ready to test Internet Identity authentication.
   </div>
   
   <div id="principalInfo" style="display:none;">
@@ -88,133 +86,32 @@
       debugEl.textContent += `[${timestamp}] ${message}\n`;
     }
 
-    // Initialize auth client
-    async function initAuthClient() {
+    // Login function - opens Internet Identity in a new window
+    function login() {
       try {
-        logDebug('Initializing AuthClient...');
+        logDebug('Opening Internet Identity login page...');
+        updateStatus('Redirecting to Internet Identity...', 'info');
         
-        if (typeof AuthClient === 'undefined') {
-          throw new Error('AuthClient not available. Make sure the script is loaded.');
-        }
+        // Open Internet Identity in a new window
+        const identityUrl = 'https://identity.ic0.app';
+        window.open(identityUrl, '_blank', 'width=500,height=600');
         
-        const authClient = await AuthClient.create({
-          idleOptions: {
-            disableIdle: true,
-            disableDefaultIdleCallback: true
-          }
-        });
-        
-        logDebug('AuthClient initialized successfully');
-        return authClient;
+        updateStatus('Internet Identity window opened. Please complete authentication there.', 'info');
+        logDebug('Internet Identity window opened');
       } catch (error) {
-        logDebug(`Error initializing AuthClient: ${error.message}`);
-        updateStatus(`Failed to initialize auth client: ${error.message}`, 'error');
-        throw error;
+        logDebug(`Error opening Internet Identity: ${error.message}`);
+        updateStatus(`Failed to open Internet Identity: ${error.message}`, 'error');
       }
     }
 
-    // Check if user is already authenticated
-    async function checkAuthentication(authClient) {
-      try {
-        const isAuthenticated = await authClient.isAuthenticated();
-        logDebug(`isAuthenticated check: ${isAuthenticated}`);
-        
-        if (isAuthenticated) {
-          const identity = authClient.getIdentity();
-          const principal = identity.getPrincipal();
-          const principalId = principal.toString();
-          
-          document.getElementById('principalId').textContent = principalId;
-          document.getElementById('principalInfo').style.display = 'block';
-          document.getElementById('loginButton').style.display = 'none';
-          document.getElementById('logoutButton').style.display = 'inline-block';
-          
-          updateStatus('You are authenticated!', 'success');
-          logDebug(`Authenticated with principal: ${principalId}`);
-        } else {
-          document.getElementById('principalInfo').style.display = 'none';
-          document.getElementById('loginButton').style.display = 'inline-block';
-          document.getElementById('logoutButton').style.display = 'none';
-          
-          updateStatus('Not authenticated. Click the login button to start.', 'info');
-          logDebug('Not authenticated');
-        }
-      } catch (error) {
-        logDebug(`Error checking authentication: ${error.message}`);
-        updateStatus(`Error checking authentication: ${error.message}`, 'error');
-      }
-    }
-
-    // Login function
-    async function login(authClient) {
-      try {
-        logDebug('Starting login process...');
-        updateStatus('Connecting to Internet Identity...', 'info');
-        
-        await authClient.login({
-          identityProvider: 'https://identity.ic0.app',
-          maxTimeToLive: BigInt(7 * 24 * 60 * 60 * 1000 * 1000 * 1000), // 7 days in nanoseconds
-          onSuccess: () => {
-            logDebug('Login successful');
-            checkAuthentication(authClient);
-          },
-          onError: (error) => {
-            logDebug(`Login error: ${error}`);
-            updateStatus(`Authentication error: ${error}`, 'error');
-          }
-        });
-      } catch (error) {
-        logDebug(`Login exception: ${error.message}`);
-        updateStatus(`Login failed: ${error.message}`, 'error');
-      }
-    }
-
-    // Logout function
-    async function logout(authClient) {
-      try {
-        logDebug('Logging out...');
-        await authClient.logout();
-        logDebug('Logout successful');
-        checkAuthentication(authClient);
-      } catch (error) {
-        logDebug(`Logout error: ${error.message}`);
-        updateStatus(`Logout failed: ${error.message}`, 'error');
-      }
-    }
-
-    // Wait for the DOM to be fully loaded
-    document.addEventListener('DOMContentLoaded', async () => {
-      try {
-        logDebug('DOM loaded, initializing auth client...');
-        
-        // Initialize the auth client
-        const authClient = await initAuthClient();
-        
-        // Check if already authenticated
-        await checkAuthentication(authClient);
-        
-        // Set up event listeners
-        document.getElementById('loginButton').addEventListener('click', () => {
-          logDebug('Login button clicked');
-          login(authClient);
-        });
-        
-        document.getElementById('logoutButton').addEventListener('click', () => {
-          logDebug('Logout button clicked');
-          logout(authClient);
-        });
-        
-        // Check authentication status when page becomes visible
-        document.addEventListener('visibilitychange', () => {
-          if (document.visibilityState === 'visible') {
-            checkAuthentication(authClient);
-          }
-        });
-      } catch (error) {
-        logDebug(`Initialization error: ${error.message}`);
-        updateStatus(`Failed to initialize: ${error.message}`, 'error');
-      }
+    // Set up event listeners
+    document.getElementById('loginButton').addEventListener('click', () => {
+      logDebug('Login button clicked');
+      login();
     });
+
+    // Log initialization
+    logDebug('Page initialized and ready for testing');
   </script>
 </body>
 </html>
