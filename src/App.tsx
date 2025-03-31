@@ -1,7 +1,7 @@
 import { FC, useState, useEffect, useCallback } from 'react';
 import { Wallet, Wallet as WalletConnect } from 'lucide-react';
 import { Actor, HttpAgent } from '@dfinity/agent';
-import { authManager } from './lib/auth';
+import { authManager, AuthMethod } from './lib/auth';
 import { proofManager } from './lib/proofManager';
 import { storageManager } from './lib/storageManager';
 import { tokenBalanceManager } from './lib/tokenBalances';
@@ -24,6 +24,7 @@ const App: FC = () => {
   const [proofStatus, setProofStatus] = useState<string>('');
   const [proofHistory, setProofHistory] = useState<ProofHistoryItem[]>([]);
   const [agent, setAgent] = useState<HttpAgent | null>(null);
+  const [showAuthOptions, setShowAuthOptions] = useState<boolean>(false);
 
   const verifySharedProof = useCallback(async (reference: string) => {
     try {
@@ -207,10 +208,11 @@ const App: FC = () => {
     }
   };
 
-  const connectWallet = async () => {
+  const connectWallet = async (method: AuthMethod) => {
     try {
       setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
-      await authManager.login();
+      setShowAuthOptions(false);
+      await authManager.login(method);
     } catch (error) {
       console.error('Failed to connect wallet:', error);
       setAuthState(prev => ({
@@ -275,6 +277,19 @@ const App: FC = () => {
     }
   };
 
+  // Get the current authentication method name for display
+  const getAuthMethodName = () => {
+    const method = authManager.getCurrentAuthMethod();
+    switch (method) {
+      case AuthMethod.INTERNET_IDENTITY:
+        return "Internet Identity";
+      case AuthMethod.PLUG_WALLET:
+        return "Plug Wallet";
+      default:
+        return "Wallet";
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
       <nav className="border-b border-gray-800 px-6 py-4">
@@ -284,29 +299,52 @@ const App: FC = () => {
             <span className="text-xl font-bold">ZK Proof System</span>
           </div>
           {!authState.isAuthenticated ? (
-            <button
-              onClick={connectWallet}
-              disabled={authState.isLoading}
-              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {authState.isLoading ? (
-                <>
-                  <LoadingSpinner size="sm" />
-                  <span>Connecting...</span>
-                </>
-              ) : (
-                <>
-                  <WalletConnect className="h-4 w-4" />
-                  <span>Connect Wallet</span>
-                </>
+            <div className="relative">
+              <button
+                onClick={() => setShowAuthOptions(!showAuthOptions)}
+                disabled={authState.isLoading}
+                className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {authState.isLoading ? (
+                  <>
+                    <LoadingSpinner size="sm" />
+                    <span>Connecting...</span>
+                  </>
+                ) : (
+                  <>
+                    <WalletConnect className="h-4 w-4" />
+                    <span>Connect Wallet</span>
+                  </>
+                )}
+              </button>
+              
+              {showAuthOptions && (
+                <div className="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-gray-800 ring-1 ring-black ring-opacity-5 z-10">
+                  <div className="py-1" role="menu" aria-orientation="vertical">
+                    <button
+                      onClick={() => connectWallet(AuthMethod.INTERNET_IDENTITY)}
+                      className="w-full text-left block px-4 py-2 text-sm text-white hover:bg-gray-700"
+                      role="menuitem"
+                    >
+                      Internet Identity
+                    </button>
+                    <button
+                      onClick={() => connectWallet(AuthMethod.PLUG_WALLET)}
+                      className="w-full text-left block px-4 py-2 text-sm text-white hover:bg-gray-700"
+                      role="menuitem"
+                    >
+                      Plug Wallet
+                    </button>
+                  </div>
+                </div>
               )}
-            </button>
+            </div>
           ) : (
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2 bg-gray-800 px-4 py-2 rounded-lg">
                 <div className="h-2 w-2 bg-green-500 rounded-full"></div>
                 <span className="text-sm font-mono">
-                  {authState.principal?.toString().slice(0, 10)}...
+                  {getAuthMethodName()}: {authState.principal?.toString().slice(0, 10)}...
                 </span>
               </div>
               <button
@@ -406,23 +444,43 @@ const App: FC = () => {
             <p className="text-gray-400 mb-8">
               Connect your wallet to generate zero-knowledge proofs of your token balances.
             </p>
-            <button
-              onClick={connectWallet}
-              disabled={authState.isLoading}
-              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg transition-colors mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {authState.isLoading ? (
-                <>
-                  <LoadingSpinner size="sm" />
-                  <span>Connecting...</span>
-                </>
-              ) : (
-                <>
-                  <WalletConnect className="h-5 w-5" />
-                  <span>Connect Wallet</span>
-                </>
-              )}
-            </button>
+            <div className="flex flex-col items-center space-y-4">
+              <button
+                onClick={() => connectWallet(AuthMethod.INTERNET_IDENTITY)}
+                disabled={authState.isLoading}
+                className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg transition-colors w-64 justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {authState.isLoading ? (
+                  <>
+                    <LoadingSpinner size="sm" />
+                    <span>Connecting...</span>
+                  </>
+                ) : (
+                  <>
+                    <img src="https://internetcomputer.org/img/IC_logo.svg" alt="Internet Identity" className="h-5 w-5" />
+                    <span>Internet Identity</span>
+                  </>
+                )}
+              </button>
+              
+              <button
+                onClick={() => connectWallet(AuthMethod.PLUG_WALLET)}
+                disabled={authState.isLoading}
+                className="flex items-center space-x-2 bg-green-600 hover:bg-green-700 px-6 py-3 rounded-lg transition-colors w-64 justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {authState.isLoading ? (
+                  <>
+                    <LoadingSpinner size="sm" />
+                    <span>Connecting...</span>
+                  </>
+                ) : (
+                  <>
+                    <img src="https://plugwallet.ooo/assets/images/plug-logo.svg" alt="Plug Wallet" className="h-5 w-5" />
+                    <span>Plug Wallet</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         )}
       </main>

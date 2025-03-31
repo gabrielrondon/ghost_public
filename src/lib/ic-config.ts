@@ -12,10 +12,12 @@ interface ICConfig {
   };
   canisterIds: {
     ghost: string;
+    zk: string;  
   };
   getHost: () => string;
   getInternetIdentityUrl: () => string;
   getCanisterId: (canisterName: keyof ICConfig['canisterIds']) => string;
+  getZkCanisterId: () => string;  
   getAuthClientOptions: () => Record<string, unknown>;
 }
 
@@ -29,33 +31,38 @@ export const IC_CONFIG: ICConfig = {
   },
   // Internet Identity configuration
   internetIdentity: {
-    local: 'http://localhost:8000?canisterId=rwlgt-iiaaa-aaaaa-aaaaa-cai',
+    local: 'http://localhost:8000?canisterId=rdmx6-jaaaa-aaaaa-aaadq-cai',
     ic: 'https://identity.ic0.app',
-    development: '/identity' // Proxy path in development
+    development: 'https://identity.ic0.app'
   },
   // Canister IDs
   canisterIds: {
-    // Your deployed canister ID
-    ghost: 'hi7bu-myaaa-aaaad-aaloa-cai',
+    ghost: import.meta.env.VITE_GHOST_CANISTER_ID || 'rrkah-fqaaa-aaaaa-aaaaq-cai',
+    zk: 'hi7bu-myaaa-aaaad-aaloa-cai'  
   },
   // Get the appropriate host based on the environment
-  getHost: () => {
-    // Always use the mainnet host for production deployments
-    return IC_CONFIG.network.ic;
+  getHost() {
+    return import.meta.env.VITE_IC_HOST || this.network.ic;
   },
   // Get the appropriate Internet Identity URL based on the environment
-  getInternetIdentityUrl: () => {
-    // Always use the mainnet Internet Identity for production deployments
-    return IC_CONFIG.internetIdentity.ic;
+  getInternetIdentityUrl() {
+    return import.meta.env.VITE_II_URL || this.internetIdentity.ic;
   },
   // Get the appropriate canister ID based on the environment
-  getCanisterId: (canisterName: keyof ICConfig['canisterIds']) => {
-    return IC_CONFIG.canisterIds[canisterName];
+  getCanisterId(canisterName: keyof ICConfig['canisterIds']) {
+    return this.canisterIds[canisterName];
+  },
+  // Get the ZK canister ID
+  getZkCanisterId() {
+    return this.canisterIds.zk;
   },
   // Get auth client options
-  getAuthClientOptions: () => {
+  getAuthClientOptions() {
     return {
-      // No special options needed for now
+      idleOptions: {
+        disableIdle: true,
+        disableDefaultIdleCallback: true
+      }
     };
   }
 };
