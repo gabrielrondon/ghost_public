@@ -90,13 +90,6 @@
   <pre id="debugInfo"></pre>
 
   <script>
-    // Define token canister IDs
-    const TOKEN_CANISTERS = {
-      ICP: 'ryjl3-tyaaa-aaaaa-aaaba-cai',
-      // Using only verified canister IDs
-      SONIC: 'qbizb-wiaaa-aaaak-aafbq-cai'
-    };
-    
     // Helper function to update status
     function updateStatus(message, type) {
       const statusEl = document.getElementById('status');
@@ -139,17 +132,11 @@
         if (window.ic?.plug) {
           logDebug('Plug wallet detected');
           
-          // Request connection to Plug with our token canisters
-          const whitelist = [
-            'hi7bu-myaaa-aaaad-aaloa-cai', // ZK canister
-            TOKEN_CANISTERS.ICP,
-            TOKEN_CANISTERS.SONIC
-          ];
-          
-          logDebug(`Connecting with whitelist: ${whitelist.join(', ')}`);
-          
+          // Request connection to Plug with minimal permissions
+          // Only whitelist our ZK canister - we don't need to whitelist token canisters
+          // for read-only operations like balance checking
           window.ic.plug.requestConnect({
-            whitelist: whitelist,
+            whitelist: ['hi7bu-myaaa-aaaad-aaloa-cai'], // Only our ZK canister
             host: 'https://ic0.app' // Explicitly use the IC mainnet
           }).then(connected => {
             if (connected) {
@@ -178,8 +165,8 @@
                   logDebug('Plug agent is not directly accessible');
                 }
                 
-                // Try to get balances using createActor if possible
-                checkICPBalance(principal);
+                // Explain how to get balances
+                explainBalanceFetching(principal);
               }
             } else {
               logDebug('User rejected Plug connection');
@@ -202,26 +189,34 @@
       }
     }
     
-    // Check ICP balance using Plug's createActor method
-    async function checkICPBalance(principal) {
+    // Explain how to fetch balances
+    function explainBalanceFetching(principal) {
       try {
-        logDebug('Attempting to check ICP balance...');
-        
-        if (!window.ic?.plug) {
-          throw new Error('Plug wallet not available');
-        }
-        
-        // Try to get the default account ID for this principal
-        logDebug(`Principal: ${principal}`);
-        logDebug('Note: To get actual token balances in the main app, we need to:');
-        logDebug('1. Use the principal to derive account IDs for each token');
-        logDebug('2. Query each token canister directly using their ledger interfaces');
-        logDebug('3. This requires implementing specific token ledger interfaces');
+        logDebug('===== IMPORTANT INFORMATION ABOUT TOKEN BALANCES =====');
+        logDebug('To get token balances in your ZK proof system:');
+        logDebug('');
+        logDebug('1. You only need to whitelist your ZK canister in Plug wallet.');
+        logDebug('   Whitelisting is only needed for write operations or identity delegation.');
+        logDebug('');
+        logDebug('2. For read-only operations like checking balances:');
+        logDebug('   - You can create a new agent with the principal from Plug');
+        logDebug('   - Query token ledgers directly without whitelisting them');
+        logDebug('');
+        logDebug('3. For ICP balances:');
+        logDebug('   - Use the principal to derive the default account ID');
+        logDebug('   - Query the ICP ledger canister (ryjl3-tyaaa-aaaaa-aaaba-cai)');
+        logDebug('');
+        logDebug('4. For other tokens:');
+        logDebug('   - Each token has its own ledger interface');
+        logDebug('   - Use token-specific methods to query balances');
+        logDebug('');
+        logDebug(`Your principal ID: ${principal}`);
+        logDebug('===================================================');
         
         updateStatus('Connected to Plug wallet successfully!', 'success');
       } catch (error) {
-        logDebug(`Error checking balance: ${error.message}`);
-        updateStatus(`Connected, but couldn't check balance: ${error.message}`, 'error');
+        logDebug(`Error: ${error.message}`);
+        updateStatus(`Error: ${error.message}`, 'error');
       }
     }
 
