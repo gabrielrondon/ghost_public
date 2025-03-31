@@ -160,7 +160,7 @@
           const whitelist = [
             'hi7bu-myaaa-aaaad-aaloa-cai', // ZK canister
             'ryjl3-tyaaa-aaaaa-aaaba-cai', // ICP Ledger
-            'qbizb-wiaaa-aaaak-aafbq-cai'  // SONIC
+            '2vxsx-fae'  // SONIC
           ];
           
           const connected = await window.ic.plug.requestConnect({
@@ -251,7 +251,7 @@
         // Try to get SONIC balance if possible
         try {
           // This requires the SONIC canister to be whitelisted
-          const sonicCanisterId = 'qbizb-wiaaa-aaaak-aafbq-cai';
+          const sonicCanisterId = '2vxsx-fae';
           
           // Create a canister interface for ICRC-1 tokens
           const icrc1Interface = ({ IDL }) => {

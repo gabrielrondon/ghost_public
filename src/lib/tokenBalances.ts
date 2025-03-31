@@ -6,7 +6,7 @@ import { sha224 } from 'js-sha256';
 // Token canister IDs
 const TOKEN_CANISTERS = {
   ICP: 'ryjl3-tyaaa-aaaaa-aaaba-cai',
-  SONIC: 'qbizb-wiaaa-aaaak-aafbq-cai'
+  SONIC: '2vxsx-fae'
 };
 
 // ICP Ledger interface
