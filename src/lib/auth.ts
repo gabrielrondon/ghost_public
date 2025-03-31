@@ -28,13 +28,18 @@ class AuthManager {
 
     console.log('Initializing AuthClient with Internet Computer configuration');
     
-    this.authClient = await AuthClient.create({
-      ...IC_CONFIG.getAuthClientOptions(),
-      idleOptions: {
-        disableIdle: true,
-        disableDefaultIdleCallback: true
-      }
-    });
+    try {
+      this.authClient = await AuthClient.create({
+        idleOptions: {
+          disableIdle: true,
+          disableDefaultIdleCallback: true
+        }
+      });
+      
+      console.log('AuthClient initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize AuthClient:', error);
+    }
     
     // Handle visibility change
     document.addEventListener('visibilitychange', () => {
@@ -95,7 +100,20 @@ class AuthManager {
       return;
     }
 
-    if (!this.authClient) throw new Error('Auth client not initialized');
+    if (!this.authClient) {
+      console.log('Reinitializing AuthClient...');
+      try {
+        this.authClient = await AuthClient.create({
+          idleOptions: {
+            disableIdle: true,
+            disableDefaultIdleCallback: true
+          }
+        });
+      } catch (error) {
+        console.error('Failed to initialize AuthClient:', error);
+        throw new Error('Failed to initialize authentication client');
+      }
+    }
 
     // Get Internet Identity URL from our configuration
     const identityProviderUrl = IC_CONFIG.getInternetIdentityUrl();
@@ -103,19 +121,54 @@ class AuthManager {
 
     return new Promise<void>((resolve, reject) => {
       try {
-        this.authClient!.login({
-          identityProvider: identityProviderUrl,
-          maxTimeToLive: BigInt(7 * 24 * 60 * 60 * 1000 * 1000 * 1000), // 7 days in nanoseconds
-          onSuccess: () => {
-            console.log('Login successful');
-            this.notifySubscribers(true);
-            resolve();
-          },
-          onError: (error) => {
-            console.error('Authentication error:', error);
-            reject(error);
+        // Open Internet Identity in a new window
+        const authWindow = window.open(identityProviderUrl, '_blank', 'width=500,height=600');
+        
+        if (!authWindow) {
+          console.error('Failed to open authentication window. Please check your popup blocker settings.');
+          reject(new Error('Failed to open authentication window'));
+          return;
+        }
+        
+        // Check if the window was closed
+        const checkWindowClosed = setInterval(() => {
+          if (authWindow.closed) {
+            clearInterval(checkWindowClosed);
+            
+            // Check if authentication was successful
+            this.authClient!.isAuthenticated().then(isAuthenticated => {
+              if (isAuthenticated) {
+                console.log('Login successful');
+                this.notifySubscribers(true);
+                resolve();
+              } else {
+                console.error('Authentication failed or was cancelled');
+                reject(new Error('Authentication failed or was cancelled'));
+              }
+            });
           }
-        });
+        }, 500);
+        
+        // Fallback to standard login if direct window approach doesn't work
+        setTimeout(() => {
+          if (!authWindow.closed) {
+            authWindow.close();
+            
+            this.authClient!.login({
+              identityProvider: identityProviderUrl,
+              maxTimeToLive: BigInt(7 * 24 * 60 * 60 * 1000 * 1000 * 1000), // 7 days in nanoseconds
+              onSuccess: () => {
+                console.log('Login successful via standard flow');
+                this.notifySubscribers(true);
+                resolve();
+              },
+              onError: (error) => {
+                console.error('Authentication error:', error);
+                reject(error);
+              }
+            });
+          }
+        }, 1000);
       } catch (error) {
         console.error('Failed to initiate login:', error);
         reject(error);

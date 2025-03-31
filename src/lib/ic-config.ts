@@ -21,6 +21,7 @@ interface ICConfig {
 
 // Determine if we're in development mode
 const isDevelopment = import.meta.env.MODE === 'development';
+const isProduction = import.meta.env.PROD === true;
 
 // Internet Computer configuration
 export const IC_CONFIG: ICConfig = {
@@ -43,18 +44,12 @@ export const IC_CONFIG: ICConfig = {
   },
   // Get the appropriate host based on the environment
   getHost: () => {
-    if (isDevelopment) {
-      console.log('Using development proxy for IC host');
-      return IC_CONFIG.network.development;
-    }
+    // Always use the mainnet host for production deployments
     return IC_CONFIG.network.ic;
   },
   // Get the appropriate Internet Identity URL based on the environment
   getInternetIdentityUrl: () => {
-    if (isDevelopment) {
-      console.log('Using development proxy for Internet Identity');
-      return IC_CONFIG.internetIdentity.development;
-    }
+    // Always use the mainnet Internet Identity for production deployments
     return IC_CONFIG.internetIdentity.ic;
   },
   // Get the appropriate canister ID based on the environment
