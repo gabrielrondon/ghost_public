@@ -60,6 +60,24 @@
       background-color: #d1ecf1;
       color: #0c5460;
     }
+    .token-balance {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #f8f9fa;
+      border-radius: 5px;
+    }
+    .token-balance h3 {
+      margin-top: 0;
+    }
+    .token-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #eee;
+    }
+    .token-item:last-child {
+      border-bottom: none;
+    }
   </style>
 </head>
 <body>
@@ -84,6 +102,11 @@
   <div id="principalInfo" style="display:none;">
     <h2>Your Principal ID:</h2>
     <pre id="principalId"></pre>
+  </div>
+
+  <div id="tokenBalances" class="token-balance" style="display:none;">
+    <h3>Token Balances</h3>
+    <div id="balanceList"></div>
   </div>
 
   <h2>Debug Information:</h2>
@@ -123,7 +146,7 @@
     }
 
     // Connect with Plug Wallet
-    function connectWithPlug() {
+    async function connectWithPlug() {
       try {
         logDebug('Attempting to connect with Plug wallet...');
         updateStatus('Connecting to Plug wallet...', 'info');
@@ -132,50 +155,55 @@
         if (window.ic?.plug) {
           logDebug('Plug wallet detected');
           
-          // Request connection to Plug with minimal permissions
-          // Only whitelist our ZK canister - we don't need to whitelist token canisters
-          // for read-only operations like balance checking
-          window.ic.plug.requestConnect({
-            whitelist: ['hi7bu-myaaa-aaaad-aaloa-cai'], // Only our ZK canister
+          // Request connection to Plug with the necessary canisters whitelisted
+          // For production, we need to whitelist the token canisters to fetch balances
+          const whitelist = [
+            'hi7bu-myaaa-aaaad-aaloa-cai', // ZK canister
+            'ryjl3-tyaaa-aaaaa-aaaba-cai', // ICP Ledger
+            'qbizb-wiaaa-aaaak-aafbq-cai'  // SONIC
+          ];
+          
+          const connected = await window.ic.plug.requestConnect({
+            whitelist,
             host: 'https://ic0.app' // Explicitly use the IC mainnet
-          }).then(connected => {
-            if (connected) {
-              logDebug('Successfully connected to Plug wallet');
-              updateStatus('Connected to Plug wallet!', 'success');
-              
-              // Get the principal ID
-              const principal = window.ic.plug.principalId;
-              if (principal) {
-                document.getElementById('principalId').textContent = principal;
-                document.getElementById('principalInfo').style.display = 'block';
-                logDebug(`Principal ID: ${principal}`);
-                
-                // Get Plug agent to check what methods are available
-                logDebug('Plug wallet API methods:');
-                for (const method in window.ic.plug) {
-                  if (typeof window.ic.plug[method] === 'function') {
-                    logDebug(`- ${method}`);
-                  }
-                }
-                
-                // Check if we can get the agent
-                if (window.ic.plug.agent) {
-                  logDebug('Plug agent is available');
-                } else {
-                  logDebug('Plug agent is not directly accessible');
-                }
-                
-                // Explain how to get balances
-                explainBalanceFetching(principal);
-              }
-            } else {
-              logDebug('User rejected Plug connection');
-              updateStatus('Plug connection was rejected', 'error');
-            }
-          }).catch(error => {
-            logDebug(`Plug connection error: ${error.message}`);
-            updateStatus(`Failed to connect to Plug: ${error.message}`, 'error');
           });
+          
+          if (connected) {
+            logDebug('Successfully connected to Plug wallet');
+            updateStatus('Connected to Plug wallet!', 'success');
+            
+            // Get the principal ID
+            const principal = window.ic.plug.principalId;
+            if (principal) {
+              document.getElementById('principalId').textContent = principal;
+              document.getElementById('principalInfo').style.display = 'block';
+              logDebug(`Principal ID: ${principal}`);
+              
+              // Get Plug agent to check what methods are available
+              logDebug('Plug wallet API methods:');
+              for (const method in window.ic.plug) {
+                if (typeof window.ic.plug[method] === 'function') {
+                  logDebug(`- ${method}`);
+                }
+              }
+              
+              // Check if we can get the agent
+              if (window.ic.plug.agent) {
+                logDebug('Plug agent is available');
+                
+                // Fetch token balances
+                await fetchTokenBalances(principal);
+              } else {
+                logDebug('Plug agent is not directly accessible');
+              }
+              
+              // Explain how to get balances
+              explainBalanceFetching(principal);
+            }
+          } else {
+            logDebug('User rejected Plug connection');
+            updateStatus('Plug connection was rejected', 'error');
+          }
         } else {
           logDebug('Plug wallet not detected');
           updateStatus('Plug wallet not detected. Please install Plug extension first.', 'error');
@@ -186,6 +214,93 @@
       } catch (error) {
         logDebug(`Error connecting to Plug: ${error.message}`);
         updateStatus(`Failed to connect to Plug: ${error.message}`, 'error');
+      }
+    }
+    
+    // Fetch token balances using Plug's built-in methods
+    async function fetchTokenBalances(principal) {
+      try {
+        logDebug('Fetching token balances using Plug wallet...');
+        
+        // Get ICP balance using Plug's built-in method
+        const icpBalance = await window.ic.plug.requestBalance();
+        logDebug(`ICP Balance from Plug: ${JSON.stringify(icpBalance)}`);
+        
+        // Display token balances
+        const balanceList = document.getElementById('balanceList');
+        balanceList.innerHTML = '';
+        
+        // Add ICP balance
+        if (icpBalance && icpBalance.length > 0) {
+          icpBalance.forEach(token => {
+            const tokenItem = document.createElement('div');
+            tokenItem.className = 'token-item';
+            tokenItem.innerHTML = `
+              <div>${token.name || 'ICP'}</div>
+              <div>${token.amount} ${token.symbol}</div>
+            `;
+            balanceList.appendChild(tokenItem);
+          });
+          
+          // Show the token balances section
+          document.getElementById('tokenBalances').style.display = 'block';
+        } else {
+          logDebug('No ICP balance found');
+        }
+        
+        // Try to get SONIC balance if possible
+        try {
+          // This requires the SONIC canister to be whitelisted
+          const sonicCanisterId = 'qbizb-wiaaa-aaaak-aafbq-cai';
+          
+          // Create a canister interface for ICRC-1 tokens
+          const icrc1Interface = ({ IDL }) => {
+            const Account = IDL.Record({
+              owner: IDL.Principal,
+              subaccount: IDL.Opt(IDL.Vec(IDL.Nat8))
+            });
+            return IDL.Service({
+              icrc1_balance_of: IDL.Func([Account], [IDL.Nat], ['query'])
+            });
+          };
+          
+          // Create the actor
+          logDebug('Creating actor for SONIC token...');
+          const sonicActor = await window.ic.plug.createActor({
+            canisterId: sonicCanisterId,
+            interfaceFactory: icrc1Interface
+          });
+          
+          if (sonicActor) {
+            logDebug('Successfully created SONIC actor, fetching balance...');
+            
+            // Query the balance
+            const sonicBalance = await sonicActor.icrc1_balance_of({
+              owner: window.ic.plug.principalId,
+              subaccount: []
+            });
+            
+            logDebug(`SONIC Balance: ${sonicBalance.toString()}`);
+            
+            // Add SONIC balance to the list
+            const tokenItem = document.createElement('div');
+            tokenItem.className = 'token-item';
+            
+            // Format the balance (8 decimals)
+            const formattedBalance = (Number(sonicBalance) / 100000000).toFixed(8);
+            
+            tokenItem.innerHTML = `
+              <div>SONIC</div>
+              <div>${formattedBalance} SONIC</div>
+            `;
+            balanceList.appendChild(tokenItem);
+          }
+        } catch (error) {
+          logDebug(`Error fetching SONIC balance: ${error.message}`);
+        }
+        
+      } catch (error) {
+        logDebug(`Error fetching token balances: ${error.message}`);
       }
     }
     
