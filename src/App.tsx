@@ -4,6 +4,7 @@ import { Actor, HttpAgent } from '@dfinity/agent';
 import { authManager } from './lib/auth';
 import { proofManager } from './lib/proofManager';
 import { storageManager } from './lib/storageManager';
+import { tokenBalanceManager } from './lib/tokenBalances';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ProofHistoryList } from './components/ProofHistoryList';
 import { WalletInfo, AuthState, ProofHistoryItem } from './types';
@@ -22,6 +23,7 @@ const App: FC = () => {
   const [actor, setActor] = useState<Actor | null>(null);
   const [proofStatus, setProofStatus] = useState<string>('');
   const [proofHistory, setProofHistory] = useState<ProofHistoryItem[]>([]);
+  const [agent, setAgent] = useState<HttpAgent | null>(null);
 
   const verifySharedProof = useCallback(async (reference: string) => {
     try {
@@ -92,13 +94,13 @@ const App: FC = () => {
       console.log('- Host:', canisterHost);
       console.log('- Canister ID:', canisterId);
 
-      const agent = new HttpAgent({
+      const newAgent = new HttpAgent({
         host: canisterHost,
         identity: authManager.getIdentity() || undefined,
       });
 
       if (import.meta.env.MODE !== 'production') {
-        await agent.fetchRootKey().catch(e => {
+        await newAgent.fetchRootKey().catch(e => {
           console.warn('Unable to fetch root key. Check to ensure that your local replica is running');
           console.error(e);
         });
@@ -108,15 +110,20 @@ const App: FC = () => {
         throw new Error('Canister ID not found in configuration');
       }
 
-      const actor = Actor.createActor<_SERVICE>(idlFactory, {
-        agent,
+      const newActor = Actor.createActor<_SERVICE>(idlFactory, {
+        agent: newAgent,
         canisterId,
       });
 
       console.log('Actor initialized successfully');
-      setActor(actor);
+      setActor(newActor);
+      setAgent(newAgent);
+      
       // Set the actor in the proofManager
-      proofManager.setActor(actor);
+      proofManager.setActor(newActor);
+      
+      // Initialize the token balance manager with the agent
+      tokenBalanceManager.initialize(newAgent);
     } catch (error) {
       console.error('Failed to initialize actor:', error);
       throw error;
@@ -136,13 +143,16 @@ const App: FC = () => {
             { symbol: 'GHOST', balance: '250' }
           ]
         };
-      } else if (actor) {
+      } else {
         const principal = authManager.getPrincipal();
         if (!principal) throw new Error('No principal found');
-        // Use principal.toString() to convert Principal to string
-        info = await (actor as unknown as _SERVICE).getWalletInfo(principal.toString());
-      } else {
-        throw new Error('Actor not initialized');
+        
+        console.log('Fetching wallet info for principal:', principal.toString());
+        
+        // Use the tokenBalanceManager to fetch balances directly from token canisters
+        info = await tokenBalanceManager.fetchAllTokenBalances(principal);
+        
+        console.log('Wallet info received:', info);
       }
       
       setWalletInfo(info);
@@ -151,7 +161,7 @@ const App: FC = () => {
       setProofStatus('Failed to fetch wallet info: ' + 
         (error instanceof Error ? error.message : 'Unknown error'));
     }
-  }, [actor]);
+  }, []);
 
   useEffect(() => {
     // Subscribe to auth state changes
@@ -177,6 +187,7 @@ const App: FC = () => {
           });
           setWalletInfo(null);
           setActor(null);
+          setAgent(null);
           proofManager.setActor(null);
           setProofHistory([]);
         }
@@ -221,6 +232,7 @@ const App: FC = () => {
       });
       setWalletInfo(null);
       setActor(null);
+      setAgent(null);
       proofManager.setActor(null);
       setProofHistory([]);
     } catch (error) {
@@ -360,44 +372,57 @@ const App: FC = () => {
                     const tokenSelect = document.getElementById('token-select') as HTMLSelectElement;
                     const amountInput = document.getElementById('amount-input') as HTMLInputElement;
                     
-                    if (tokenSelect && amountInput && tokenSelect.value && amountInput.value) {
+                    if (tokenSelect.value && amountInput.value) {
                       generateProof(tokenSelect.value, amountInput.value);
                     } else {
                       setProofStatus('Please select a token and enter an amount');
                     }
                   }}
-                  className="w-full bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors"
+                  className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors w-full"
                 >
                   Generate Proof
                 </button>
                 
                 {proofStatus && (
-                  <div className="mt-4 p-3 bg-gray-700 rounded-lg text-center">
+                  <div className="mt-4 p-4 bg-gray-700 rounded-lg">
                     {proofStatus}
                   </div>
                 )}
               </div>
             </div>
             
-            <ProofHistoryList proofs={proofHistory} />
+            <div className="bg-gray-800 rounded-lg p-6">
+              <h2 className="text-xl font-bold mb-4">Proof History</h2>
+              <ProofHistoryList proofs={proofHistory} />
+            </div>
           </div>
-        ) : !authState.isLoading && !authState.isAuthenticated ? (
-          <div className="text-center py-12">
+        ) : authState.isAuthenticated ? (
+          <div className="flex justify-center items-center h-64">
+            <LoadingSpinner size="lg" />
+          </div>
+        ) : (
+          <div className="text-center py-16">
             <h2 className="text-2xl font-bold mb-4">Connect Your Wallet</h2>
-            <p className="text-gray-400 mb-6">
-              Connect your wallet to generate and manage zero-knowledge proofs.
+            <p className="text-gray-400 mb-8">
+              Connect your wallet to generate zero-knowledge proofs of your token balances.
             </p>
             <button
               onClick={connectWallet}
-              className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg transition-colors"
+              disabled={authState.isLoading}
+              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg transition-colors mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <WalletConnect className="h-5 w-5" />
-              <span>Connect Wallet</span>
+              {authState.isLoading ? (
+                <>
+                  <LoadingSpinner size="sm" />
+                  <span>Connecting...</span>
+                </>
+              ) : (
+                <>
+                  <WalletConnect className="h-5 w-5" />
+                  <span>Connect Wallet</span>
+                </>
+              )}
             </button>
-          </div>
-        ) : (
-          <div className="flex justify-center py-12">
-            <LoadingSpinner size="lg" />
           </div>
         )}
       </main>

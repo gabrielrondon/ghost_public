@@ -34,10 +34,30 @@ fn get_wallet_info(address: String) -> WalletInfo {
         store.borrow()
             .get(&address)
             .cloned()
-            .unwrap_or_else(|| WalletInfo {
-                address: address.clone(),
-                balance: "0".to_string(),
-                tokens: vec![],
+            .unwrap_or_else(|| {
+                // Return default tokens for testing purposes
+                WalletInfo {
+                    address: address.clone(),
+                    balance: "1000".to_string(),
+                    tokens: vec![
+                        TokenInfo {
+                            symbol: "ICP".to_string(),
+                            balance: "100".to_string(),
+                        },
+                        TokenInfo {
+                            symbol: "GHOST".to_string(),
+                            balance: "500".to_string(),
+                        },
+                        TokenInfo {
+                            symbol: "BTC".to_string(),
+                            balance: "0.05".to_string(),
+                        },
+                        TokenInfo {
+                            symbol: "ETH".to_string(),
+                            balance: "2.5".to_string(),
+                        },
+                    ],
+                }
             })
     })
 }
